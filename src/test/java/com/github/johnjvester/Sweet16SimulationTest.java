@@ -34,16 +34,19 @@ class Sweet16SimulationTest {
         );
 
         for (int ratingLevel : ratingLevels) {
-            RoundHitReport report = findFirstRoundHits(spec, ratingLevel, MAX_ITERATIONS);
+            CumulativeHitReport report = findCumulativeRoundHits(spec, ratingLevel, MAX_ITERATIONS);
 
             System.out.printf(Locale.ROOT,
-                    "ratingLevel=%d Sweet 16=%s Elite 8=%s Final 4=%s Final 2=%s Champion=%s%n",
+                    "ratingLevel=%d Elite 8 attempts=%s cumulative=%s Final 4 attempts=%s cumulative=%s Title Game attempts=%s cumulative=%s Champion attempts=%s cumulative=%s%n",
                     ratingLevel,
-                    formatHit(report.sweet16()),
-                    formatHit(report.elite8()),
-                    formatHit(report.final4()),
-                    formatHit(report.final2()),
-                    formatHit(report.champion()));
+                    formatStage(report.sweet16()),
+                    formatIteration(report.sweet16Cumulative()),
+                    formatStage(report.elite8()),
+                    formatIteration(report.elite8Cumulative()),
+                    formatStage(report.final4()),
+                    formatIteration(report.final4Cumulative()),
+                    formatStage(report.champion()),
+                    formatIteration(report.championCumulative()));
         }
     }
 
@@ -69,37 +72,43 @@ class Sweet16SimulationTest {
         assertTrue(throwingInput.contains(throwingResult.get(0)));
     }
 
-    private RoundHitReport findFirstRoundHits(TournamentSpec spec, int ratingLevel, long maxIterations) {
-        Long sweet16 = null;
-        Long elite8 = null;
-        Long final4 = null;
-        Long final2 = null;
-        Long champion = null;
+    private CumulativeHitReport findCumulativeRoundHits(TournamentSpec spec, int ratingLevel, long maxIterations) {
+        StageHit sweet16 = findStageHit(spec, ratingLevel, maxIterations, 1L, outcome -> outcome.matchesSweet16(spec));
+        StageHit elite8 = sweet16.found()
+                ? findStageHit(spec, ratingLevel, maxIterations, sweet16.cumulativeIteration() + 1, outcome -> outcome.matchesElite8(spec))
+                : StageHit.notFound();
+        StageHit final4 = elite8.found()
+                ? findStageHit(spec, ratingLevel, maxIterations, elite8.cumulativeIteration() + 1, outcome -> outcome.matchesFinal4(spec))
+                : StageHit.notFound();
+        StageHit final2 = final4.found()
+                ? findStageHit(spec, ratingLevel, maxIterations, final4.cumulativeIteration() + 1, outcome -> outcome.matchesFinal2(spec))
+                : StageHit.notFound();
+        StageHit champion = final2.found()
+                ? findStageHit(spec, ratingLevel, maxIterations, final2.cumulativeIteration() + 1, outcome -> outcome.matchesChampion(spec))
+                : StageHit.notFound();
 
-        for (long iteration = 1; iteration <= maxIterations; iteration++) {
+        return new CumulativeHitReport(sweet16, elite8, final4, final2, champion);
+    }
+
+    private StageHit findStageHit(TournamentSpec spec,
+                                  int ratingLevel,
+                                  long maxIterations,
+                                  long startIteration,
+                                  java.util.function.Predicate<TournamentOutcome> predicate) {
+        if (startIteration > maxIterations) {
+            return StageHit.notFound();
+        }
+
+        long attempts = 0;
+        for (long iteration = startIteration; iteration <= maxIterations; iteration++) {
+            attempts++;
             TournamentOutcome outcome = simulate(spec, ratingLevel, iteration);
-            if (sweet16 == null && outcome.matchesSweet16(spec)) {
-                sweet16 = iteration;
-            }
-            if (elite8 == null && outcome.matchesElite8(spec)) {
-                elite8 = iteration;
-            }
-            if (final4 == null && outcome.matchesFinal4(spec)) {
-                final4 = iteration;
-            }
-            if (final2 == null && outcome.matchesFinal2(spec)) {
-                final2 = iteration;
-            }
-            if (champion == null && outcome.matchesChampion(spec)) {
-                champion = iteration;
-            }
-
-            if (sweet16 != null && elite8 != null && final4 != null && final2 != null && champion != null) {
-                break;
+            if (predicate.test(outcome)) {
+                return new StageHit(attempts, iteration);
             }
         }
 
-        return new RoundHitReport(sweet16, elite8, final4, final2, champion);
+        return StageHit.notFound();
     }
 
     private TournamentOutcome simulate(TournamentSpec spec, int ratingLevel, long seed) {
@@ -228,7 +237,13 @@ class Sweet16SimulationTest {
         return List.of(matcher.group(1), matcher.group(2));
     }
 
-    private String formatHit(Long iteration) {
+    private String formatStage(StageHit stageHit) {
+        return stageHit.found()
+                ? String.format(Locale.ROOT, "%,d", stageHit.attempts())
+                : "not found";
+    }
+
+    private String formatIteration(Long iteration) {
         return iteration == null ? "not found" : String.format(Locale.ROOT, "%,d", iteration);
     }
 
@@ -273,7 +288,42 @@ class Sweet16SimulationTest {
         }
     }
 
-    private record RoundHitReport(Long sweet16, Long elite8, Long final4, Long final2, Long champion) {
+    private record CumulativeHitReport(
+            StageHit sweet16,
+            StageHit elite8,
+            StageHit final4,
+            StageHit final2,
+            StageHit champion) {
+
+        private Long sweet16Cumulative() {
+            return sweet16.found() ? sweet16.cumulativeIteration() : null;
+        }
+
+        private Long elite8Cumulative() {
+            return elite8.found() ? elite8.cumulativeIteration() : null;
+        }
+
+        private Long final4Cumulative() {
+            return final4.found() ? final4.cumulativeIteration() : null;
+        }
+
+        private Long final2Cumulative() {
+            return final2.found() ? final2.cumulativeIteration() : null;
+        }
+
+        private Long championCumulative() {
+            return champion.found() ? champion.cumulativeIteration() : null;
+        }
+    }
+
+    private record StageHit(long attempts, long cumulativeIteration) {
+        private static StageHit notFound() {
+            return new StageHit(-1L, -1L);
+        }
+
+        private boolean found() {
+            return attempts >= 0;
+        }
     }
 
     private record ThrowingTeam(String name, double rating) {
