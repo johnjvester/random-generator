@@ -1,6 +1,6 @@
 # Random Generator
 
-`random-generator` is a small Java 21 project for shuffling lists and delimiter-separated strings, with optional result limits and rating-based filtering. It also includes a CLI for generating random full names.
+`random-generator` is a small Java 21 project for shuffling lists and delimiter-separated strings, with optional result limits and weighted rating-based selection. It also includes a CLI for generating random full names.
 
 ## Requirements
 
@@ -40,11 +40,11 @@ Package: `com.github.johnjvester`
 Supported constants:
 
 - `DEFAULT_DELIMITER = "~~~"`
-- `RATING = "rating"`
-- `RATING_LEVEL_OFF = 0`
-- `RATING_LEVEL_LOW = 1`
-- `RATING_LEVEL_MEDIUM = 2`
-- `RATING_LEVEL_HIGH = 3`
+- `RATING = "rating"` — the property/field name used for weighted selection, and the legacy string marker name
+- `RATING_LEVEL_OFF = 0` — disable rating weighting
+- `RATING_LEVEL_LOW = 1` — low weighting strength
+- `RATING_LEVEL_MEDIUM = 2` — medium weighting strength
+- `RATING_LEVEL_HIGH = 3` — high weighting strength
 
 Supported methods:
 
@@ -57,6 +57,80 @@ Supported methods:
 - `String randomize(String thisString, String thisSeparator)`
 - `String randomize(String thisString, String thisSeparator, Integer maxResults)`
 
+Examples:
+
+```java
+import com.github.johnjvester.RandomGenerator;
+
+import java.util.List;
+
+class Team {
+    private final String name;
+    private final double rating;
+
+    Team(String name, double rating) {
+        this.name = name;
+        this.rating = rating;
+    }
+
+    String name() {
+        return name;
+    }
+
+    double rating() {
+        return rating;
+    }
+}
+
+RandomGenerator<Team> generator = new RandomGenerator<>();
+List<Team> teams = List.of(
+    new Team("alpha", 1.0),
+    new Team("beta", 3.5),
+    new Team("gamma", 9.0),
+    new Team("delta", 2.25)
+);
+
+List<Team> randomized = generator.randomize(teams);
+List<Team> limited = generator.randomize(teams, 2);
+```
+
+Using `ratingLevel` to increase how strongly the `rating` value influences the result:
+
+```java
+import com.github.johnjvester.RandomGenerator;
+
+import java.util.List;
+
+class Team {
+    private final String name;
+    private final double rating;
+
+    Team(String name, double rating) {
+        this.name = name;
+        this.rating = rating;
+    }
+
+    String name() {
+        return name;
+    }
+
+    double rating() {
+        return rating;
+    }
+}
+
+RandomGenerator<Team> generator = new RandomGenerator<>();
+List<Team> teams = List.of(
+    new Team("alpha", 1.0),
+    new Team("beta", 3.5),
+    new Team("gamma", 9.0),
+    new Team("delta", 2.25)
+);
+
+List<Team> lightlyWeighted = generator.randomize(teams, RandomGenerator.RATING_LEVEL_LOW);
+List<Team> stronglyWeighted = generator.randomize(teams, RandomGenerator.RATING_LEVEL_HIGH);
+```
+
 Behavior summary:
 
 - `null` list inputs are treated as empty lists.
@@ -65,13 +139,11 @@ Behavior summary:
 - Empty trailing segments are ignored when splitting.
 - Randomization uses a shuffled copy, so the input collection is not modified.
 - `maxResults` trims the randomized result after shuffling.
-- Rating-aware overloads look for embedded markers using the default format:
-
-```text
-<value>~~~rating~~~<number>
-```
-
-Values without a rating marker, or values that cannot be parsed cleanly, are treated as `RATING_LEVEL_HIGH`.
+- Rating-aware overloads read a `rating` property, getter, or field when present.
+- The `rating` value can be any numeric type, including floating-point values.
+- Higher ratings increase the chance that an item appears earlier in the randomized result.
+- `RATING_LEVEL_LOW`, `RATING_LEVEL_MEDIUM`, and `RATING_LEVEL_HIGH` progressively increase how much the rating influences selection.
+- Legacy strings in the form `<value>~~~rating~~~<number>` are still recognized as a fallback.
 
 ## CLI
 
