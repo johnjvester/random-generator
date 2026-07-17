@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Randomizes list and delimiter-separated string inputs, with optional size limiting
@@ -76,6 +77,22 @@ public class RandomGenerator<T> {
     }
 
     /**
+     * Randomizes the supplied list using weighted rating-based selection from the provided accessor.
+     *
+     * @param tList list to shuffle; {@code null} is treated as empty
+     * @param ratingAccessor function that extracts the numeric rating for each item
+     * @param ratingLevel weighting strength; higher values increase the influence of the rating
+     * @return a randomized list
+     */
+    public List<T> randomize(List<T> tList, ToDoubleFunction<? super T> ratingAccessor, int ratingLevel) {
+        if (ratingLevel <= RATING_LEVEL_OFF) {
+            return randomize(tList);
+        }
+
+        return weightedShuffle(copyOf(tList), ratingLevel, ratingAccessor);
+    }
+
+    /**
      * Randomizes the supplied list and returns at most {@code maxResults} elements.
      *
      * @param tList list to shuffle; {@code null} is treated as empty
@@ -114,6 +131,20 @@ public class RandomGenerator<T> {
      */
     public List<T> randomize(List<T> tList, Integer maxResults, int ratingLevel) {
         return limit(randomize(tList, ratingLevel), maxResults);
+    }
+
+    /**
+     * Randomizes the supplied list using weighted rating-based selection from the provided accessor
+     * and returns at most {@code maxResults} elements.
+     *
+     * @param tList list to shuffle; {@code null} is treated as empty
+     * @param maxResults maximum number of elements to return
+     * @param ratingAccessor function that extracts the numeric rating for each item
+     * @param ratingLevel weighting strength; higher values increase the influence of the rating
+     * @return a randomized list trimmed to the requested size when applicable
+     */
+    public List<T> randomize(List<T> tList, Integer maxResults, ToDoubleFunction<? super T> ratingAccessor, int ratingLevel) {
+        return limit(randomize(tList, ratingAccessor, ratingLevel), maxResults);
     }
 
     /**
@@ -158,11 +189,19 @@ public class RandomGenerator<T> {
     }
 
     private List<T> weightedShuffle(List<T> values, int ratingLevel) {
+        return weightedShuffle(values, ratingLevel, null);
+    }
+
+    private List<T> weightedShuffle(List<T> values, int ratingLevel, ToDoubleFunction<? super T> ratingAccessor) {
+        if (values.size() == 2 && ratingAccessor != null) {
+            return headToHead(values, ratingLevel, ratingAccessor);
+        }
+
         List<WeightedValue<T>> weightedValues = new ArrayList<>(values.size());
         double exponent = ratingExponent(ratingLevel);
 
         for (T value : values) {
-            weightedValues.add(new WeightedValue<>(value, priorityFor(value, exponent)));
+            weightedValues.add(new WeightedValue<>(value, priorityFor(value, exponent, ratingAccessor)));
         }
 
         weightedValues.sort(Comparator.comparingDouble(WeightedValue::priority));
@@ -175,14 +214,38 @@ public class RandomGenerator<T> {
         return result;
     }
 
-    private double priorityFor(Object value, double ratingExponent) {
-        double rating = resolveRating(value);
+    private List<T> headToHead(List<T> values, int ratingLevel, ToDoubleFunction<? super T> ratingAccessor) {
+        T left = values.get(0);
+        T right = values.get(1);
+        T winner = chooseWinner(left, right, ratingLevel, ratingAccessor);
+        T loser = Objects.equals(winner, left) ? right : left;
+
+        List<T> result = new ArrayList<>(2);
+        result.add(winner);
+        result.add(loser);
+        return result;
+    }
+
+    private T chooseWinner(T left, T right, int ratingLevel, ToDoubleFunction<? super T> ratingAccessor) {
+        double leftRating = resolveRating(left, ratingAccessor);
+        double rightRating = resolveRating(right, ratingAccessor);
+        double scale = pairwiseScale(ratingLevel);
+        double leftProbability = 1.0d / (1.0d + Math.exp((rightRating - leftRating) * scale));
+        return random.nextDouble() < leftProbability ? left : right;
+    }
+
+    private double priorityFor(Object value, double ratingExponent, ToDoubleFunction<? super T> ratingAccessor) {
+        double rating = resolveRating(value, ratingAccessor);
         double weight = Math.pow(rating, ratingExponent);
         double randomValue = Math.max(random.nextDouble(), Double.MIN_VALUE);
         return -Math.log(randomValue) / weight;
     }
 
-    private double resolveRating(Object value) {
+    private double resolveRating(Object value, ToDoubleFunction<? super T> ratingAccessor) {
+        if (ratingAccessor != null) {
+            return positiveRating(ratingFromAccessor(value, ratingAccessor));
+        }
+
         if (value == null) {
             return 1.0d;
         }
@@ -204,6 +267,19 @@ public class RandomGenerator<T> {
         }
 
         return 1.0d;
+    }
+
+    @SuppressWarnings("unchecked")
+    private double ratingFromAccessor(Object value, ToDoubleFunction<? super T> ratingAccessor) {
+        if (value == null) {
+            return 1.0d;
+        }
+
+        try {
+            return ratingAccessor.applyAsDouble((T) value);
+        } catch (RuntimeException ex) {
+            return 1.0d;
+        }
     }
 
     private double positiveRating(double rating) {
@@ -321,6 +397,15 @@ public class RandomGenerator<T> {
             case RATING_LEVEL_MEDIUM -> 2.0d;
             case RATING_LEVEL_HIGH -> 3.0d;
             default -> 3.0d;
+        };
+    }
+
+    private double pairwiseScale(int ratingLevel) {
+        return switch (ratingLevel) {
+            case RATING_LEVEL_LOW -> 5.0d;
+            case RATING_LEVEL_MEDIUM -> 10.0d;
+            case RATING_LEVEL_HIGH -> 15.0d;
+            default -> 10.0d;
         };
     }
 

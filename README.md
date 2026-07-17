@@ -51,9 +51,11 @@ Supported methods:
 - `List<T> randomize(List<T> tList)`
 - `List<T> randomize(List<T> tList, Boolean useRating)`
 - `List<T> randomize(List<T> tList, int ratingLevel)`
+- `List<T> randomize(List<T> tList, ToDoubleFunction<? super T> ratingAccessor, int ratingLevel)`
 - `List<T> randomize(List<T> tList, Integer maxResults)`
 - `List<T> randomize(List<T> tList, Integer maxResults, Boolean useRating)`
 - `List<T> randomize(List<T> tList, Integer maxResults, int ratingLevel)`
+- `List<T> randomize(List<T> tList, Integer maxResults, ToDoubleFunction<? super T> ratingAccessor, int ratingLevel)`
 - `String randomize(String thisString, String thisSeparator)`
 - `String randomize(String thisString, String thisSeparator, Integer maxResults)`
 
@@ -92,6 +94,7 @@ List<Team> teams = List.of(
 
 List<Team> randomized = generator.randomize(teams);
 List<Team> limited = generator.randomize(teams, 2);
+List<Team> explicitRating = generator.randomize(teams, Team::rating, RandomGenerator.RATING_LEVEL_HIGH);
 ```
 
 Using `ratingLevel` to increase how strongly the `rating` value influences the result:
@@ -129,6 +132,7 @@ List<Team> teams = List.of(
 
 List<Team> lightlyWeighted = generator.randomize(teams, RandomGenerator.RATING_LEVEL_LOW);
 List<Team> stronglyWeighted = generator.randomize(teams, RandomGenerator.RATING_LEVEL_HIGH);
+List<Team> explicitRating = generator.randomize(teams, Team::rating, RandomGenerator.RATING_LEVEL_HIGH);
 ```
 
 Behavior summary:
@@ -143,6 +147,7 @@ Behavior summary:
 - The `rating` value can be any numeric type, including floating-point values.
 - Higher ratings increase the chance that an item appears earlier in the randomized result.
 - `RATING_LEVEL_LOW`, `RATING_LEVEL_MEDIUM`, and `RATING_LEVEL_HIGH` progressively increase how much the rating influences selection.
+- The accessor-based overloads use a head-to-head win model for two-item picks, which is a better fit for game simulations.
 - Legacy strings in the form `<value>~~~rating~~~<number>` are still recognized as a fallback.
 
 ## CLI

@@ -88,6 +88,41 @@ class RandomGeneratorTest {
     }
 
     @Test
+    void randomizeListWithAccessorHeadToHeadSeparatesRatingLevels() {
+        List<BracketTeam> input = List.of(
+                new BracketTeam("underdog", 0.581d),
+                new BracketTeam("favorite", 0.688d)
+        );
+
+        long seed = -4618295442963808721L;
+
+        List<BracketTeam> low = new RandomGenerator<BracketTeam>(new Random(seed))
+                .randomize(input, BracketTeam::rating, RandomGenerator.RATING_LEVEL_LOW);
+        List<BracketTeam> medium = new RandomGenerator<BracketTeam>(new Random(seed))
+                .randomize(input, BracketTeam::rating, RandomGenerator.RATING_LEVEL_MEDIUM);
+        List<BracketTeam> high = new RandomGenerator<BracketTeam>(new Random(seed))
+                .randomize(input, BracketTeam::rating, RandomGenerator.RATING_LEVEL_HIGH);
+
+        assertEquals("underdog", low.get(0).name());
+        assertEquals("underdog", medium.get(0).name());
+        assertEquals("favorite", high.get(0).name());
+    }
+
+    @Test
+    void randomizeListWithAccessorUsesDefaultPairwiseScaleForUnknownLevel() {
+        List<BracketTeam> input = List.of(
+                new BracketTeam("underdog", 0.581d),
+                new BracketTeam("favorite", 0.688d)
+        );
+
+        List<BracketTeam> result = new RandomGenerator<BracketTeam>(new Random(-4618295442963808721L))
+                .randomize(input, BracketTeam::rating, 99);
+
+        assertEquals(2, result.size());
+        assertTrue(input.containsAll(result));
+    }
+
+    @Test
     void randomizeListWithRatingLevelDefaultBranchUsesWeightedPath() {
         List<RatedItem> input = List.of(
                 new RatedItem("low", 1),
@@ -398,10 +433,17 @@ class RandomGeneratorTest {
             return item.label();
         }
 
+        if (value instanceof BracketTeam item) {
+            return item.name();
+        }
+
         return value == null ? "null" : value.toString();
     }
 
     private record RatedItem(String label, int rating) {
+    }
+
+    private record BracketTeam(String name, double rating) {
     }
 
     private record ThrowingGetterItem(String label, int rating) {
