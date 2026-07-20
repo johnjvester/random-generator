@@ -37,14 +37,11 @@ class Sweet16SimulationTest {
             CumulativeHitReport report = findCumulativeRoundHits(spec, ratingLevel, MAX_ITERATIONS);
 
             System.out.printf(Locale.ROOT,
-                    "ratingLevel=%d Elite 8 attempts=%s cumulative=%s Final 4 attempts=%s cumulative=%s Title Game attempts=%s cumulative=%s Champion attempts=%s cumulative=%s%n",
+                    "ratingLevel=%d Elite 8 attempts=%s, Final 4 attempts=%s, Title Game attempts=%s, Champion attempts=%s (Total Iterations Required=%s)%n",
                     ratingLevel,
                     formatStage(report.sweet16()),
-                    formatIteration(report.sweet16Cumulative()),
                     formatStage(report.elite8()),
-                    formatIteration(report.elite8Cumulative()),
                     formatStage(report.final4()),
-                    formatIteration(report.final4Cumulative()),
                     formatStage(report.champion()),
                     formatIteration(report.championCumulative()));
         }

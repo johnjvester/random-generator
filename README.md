@@ -150,6 +150,34 @@ Behavior summary:
 - The accessor-based overloads use a head-to-head win model for two-item picks, which is a better fit for game simulations.
 - Legacy strings in the form `<value>~~~rating~~~<number>` are still recognized as a fallback.
 
+### 2026 Men's NCAA Basketball Sweet 16 Simulation Example
+
+Using the [`ncaa-mens-basketball-sweet-16.txt`](./ncaa-mens-basketball-sweet-16.txt) sample data file, `random-generator` 
+was used to determine the number of iterations were needed to match the actual outcomes for all the games in the following 
+rounds:
+
+* Sweet 16 match-ups → Elite 8 match-ups
+* Elite 8 match-ups → Final 4 match-ups
+* Final 4 match-ups → Championship match-up
+* Championship match-up → Champion
+
+The [`ncaa-mens-basketball-sweet-16.txt`](./ncaa-mens-basketball-sweet-16.txt) file contains each of the 16 teams RPI 
+(rating percentage index), which was used for cases where the `ratingLevel` was enabled (values 1, 2 and 3).
+
+The [`Sweet16SimulationTest`](./src/test/java/com/github/johnjvester/Sweet16SimulationTest.java) class was created, which 
+uses `ratingLevel` values 0 (off), 1, 2, 3 and provides the following output:
+
+```shell
+ratingLevel=0 Elite 8 attempts=26, Final 4 attempts=79, Title Game attempts=80, Champion attempts=29 (Total Iterations Required=328)
+ratingLevel=1 Elite 8 attempts=4,206, Final 4 attempts=413, Title Game attempts=59, Champion attempts=21 (Total Iterations Required=4,811)
+ratingLevel=2 Elite 8 attempts=1,650, Final 4 attempts=309, Title Game attempts=20, Champion attempts=2 (Total Iterations Required=2,053)
+ratingLevel=3 Elite 8 attempts=553, Final 4 attempts=492, Title Game attempts=2, Champion attempts=4 (Total Iterations Required=1,067)
+```
+
+In this example, `ratingLevel=0` (disabled) is the fastest.  However, when `ratingLevel` is enabled, the `HIGH` 
+(`ratingLevel=3`) option required the less number of attempts to match the actual outcome for all games in the 
+tournament.
+
 ## CLI
 
 The CLI is implemented in `Main.main(String[] args)`.
